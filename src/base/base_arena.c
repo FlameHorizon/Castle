@@ -29,10 +29,10 @@ internal Arena *
 arena_alloc_(ArenaParams *params)
 {
   ProfBeginFunction();
-  
+
   U64 reserve_size = params->reserve_size;
   U64 commit_size  = params->commit_size;
-  
+
   // rjf: reserve/commit initial block
   void *base = params->optional_backing_buffer;
   if(base == 0)
@@ -48,7 +48,7 @@ arena_alloc_(ArenaParams *params)
       reserve_size = AlignPow2(reserve_size, get_system_info()->page_size);
       commit_size  = AlignPow2(commit_size,  get_system_info()->page_size);
     }
-    
+
     if(params->flags & ArenaFlag_LargePages)
     {
       base = reserve_memory_large(reserve_size);
@@ -67,7 +67,7 @@ arena_alloc_(ArenaParams *params)
   {
     AsanPoisonMemoryRegion(base, params->reserve_size);
   }
-  
+
   // rjf: panic on arena creation failure
   if(Unlikely(base == 0))
   {
@@ -76,7 +76,7 @@ arena_alloc_(ArenaParams *params)
 #endif
     abort_self(1);
   }
-  
+
   // rjf: extract arena header & fill
   AsanUnpoisonMemoryRegion(base, ARENA_HEADER_SIZE);
   Arena *arena                = base;
@@ -94,7 +94,7 @@ arena_alloc_(ArenaParams *params)
 #if ARENA_FREE_LIST
   arena->free_last = 0;
 #endif
-  
+
   // rjf: store in global arena table
 #if ARENA_TABLE_DEBUG
   if(ins_atomic_u64_eval_cond_assign(&arena_table_take_init, 1, 0) == 0)
@@ -134,7 +134,7 @@ arena_alloc_(ArenaParams *params)
     }
   }
 #endif
-  
+
   ProfEnd();
   return arena;
 }
@@ -143,7 +143,7 @@ internal void
 arena_release(Arena *arena)
 {
   ProfBeginFunction();
-  
+
 #if PROFILE_TELEMETRY
   {
     Arena *base_arena = arena;
@@ -151,7 +151,7 @@ arena_release(Arena *arena)
     tmPlot(0, TM_PLOT_UNITS_MEMORY, TM_PLOT_DRAW_LINE, 0, "%s/%p", base_arena->name, base_arena);
   }
 #endif
-  
+
 #if ARENA_FREE_LIST
   Arena *last = arena->current;
   for (; last->prev != 0; last = last->prev);
@@ -176,14 +176,14 @@ arena_release(Arena *arena)
     }
   }
 #endif
-  
+
   for(Arena *n = arena->current, *prev = 0; n != 0; n = prev)
   {
     prev = n->prev;
     AsanUnpoisonMemoryRegion(n, n->cmt);
     release_memory(n, n->res);
   }
-  
+
   ProfEnd();
 }
 
@@ -210,7 +210,7 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
   Arena *current = arena->current;
   U64 pos_pre = AlignPow2(current->pos, align);
   U64 pos_pst = pos_pre + size;
-  
+
   // TODO: Newly allocated arenas already have zeroed commited pages,
   //       so this unnecessarily zeroes them again.
   //
@@ -220,12 +220,12 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
   {
     size_to_zero = pos_pre < current->cmt ? Min(current->cmt, pos_pst) - pos_pre : 0;
   }
-  
+
   // rjf: chain, if needed
   if(current->res < pos_pst && !(arena->flags & ArenaFlag_NoChain))
   {
     Arena *new_block = 0;
-    
+
 #if ARENA_FREE_LIST
     {
       Arena *prev_block;
@@ -246,7 +246,7 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
       }
     }
 #endif
-    
+
     if(new_block == 0)
     {
       U64 res_size = arena->res_size;
@@ -261,22 +261,22 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
                               .flags        = arena->flags,
                               .allocation_site_file = arena->allocation_site_file,
                               .allocation_site_line = arena->allocation_site_line);
-      
+
       size_to_zero = 0;
     }
     else
     {
       size_to_zero = zero ? size : 0;
     }
-    
+
     new_block->base_pos = current->base_pos + current->res;
     SLLStackPush_N(arena->current, new_block, prev);
-    
+
     current = new_block;
     pos_pre = AlignPow2(current->pos, align);
     pos_pst = pos_pre + size;
   }
-  
+
   // rjf: commit new pages, if needed
   if(current->cmt < pos_pst)
   {
@@ -296,7 +296,7 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
     AsanPoisonMemoryRegion(cmt_ptr, cmt_size);
     current->cmt = cmt_pst_clamped;
   }
-  
+
   // rjf: push onto current block
   void *result = 0;
   if(current->cmt >= pos_pst)
@@ -306,7 +306,7 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
     AsanUnpoisonMemoryRegion(result, size);
     MemoryZero(result, size_to_zero);
   }
-  
+
 #if PROFILE_TELEMETRY
   if(size > KB(1))
   {
@@ -315,7 +315,7 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
     tmPlot(0, TM_PLOT_UNITS_MEMORY, TM_PLOT_DRAW_LINE, (double)(current->base_pos + current->pos) / 1024.0 / 1024.0, "%s/%p", base_arena->name, base_arena);
   }
 #endif
-  
+
   // rjf: panic on failure
   if(Unlikely(result == 0))
   {
@@ -324,7 +324,7 @@ arena_push(Arena *arena, U64 size, U64 align, B32 zero)
 #endif
     abort_self(1);
   }
-  
+
   return result;
 }
 
@@ -341,7 +341,7 @@ arena_pop_to(Arena *arena, U64 pos)
 {
   U64 big_pos = ClampBot(ARENA_HEADER_SIZE, pos);
   Arena *current = arena->current;
-  
+
 #if ARENA_FREE_LIST
   for(Arena *prev = 0; current->base_pos >= big_pos; current = prev)
   {
@@ -363,7 +363,7 @@ arena_pop_to(Arena *arena, U64 pos)
   AssertAlways(new_pos <= current->pos);
   AsanPoisonMemoryRegion((U8*)current + new_pos, (current->pos - new_pos));
   current->pos = new_pos;
-  
+
 #if PROFILE_TELEMETRY
   if((pos - (new_pos + current->base_pos)) > KB(1))
   {
@@ -372,7 +372,7 @@ arena_pop_to(Arena *arena, U64 pos)
     tmPlot(0, TM_PLOT_UNITS_MEMORY, TM_PLOT_DRAW_LINE, (double)(current->base_pos + current->pos) / 1024.0 / 1024.0, "%s/%p", base_arena->name, base_arena);
   }
 #endif
-  
+
 }
 
 //- rjf: arena push/pop helpers

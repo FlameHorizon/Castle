@@ -29,6 +29,7 @@
 #include "base_log.c"
 #include "base_test.c"
 #include "base_entry_point.c"
+#include "base_hashtable.c"
 
 #if OS_WINDOWS
 # include "../win32/base/win32_base.c"

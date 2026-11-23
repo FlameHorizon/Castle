@@ -35,6 +35,12 @@ union SHA256
 };
 
 ////////////////////////////////
+//~ Integer Hashes (for hash tables)
+
+internal U64 u64_hash_from_u64(U64 x);
+internal U64 u64_hash_from_s32(S32 x);
+
+////////////////////////////////
 //~ rjf: MD5
 
 internal MD5 md5_from_data(String8 data);

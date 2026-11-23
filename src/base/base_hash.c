@@ -2,6 +2,29 @@
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
+//~ Integer Hashes (for hash tables)
+
+// MurmurHash3 64-bit finalizer: bijective, good avalanche, no multiplications by
+// small constants, so sequential keys (0,1,2,...) spread evenly across buckets.
+internal U64
+u64_hash_from_u64(U64 x)
+{
+  x ^= x >> 33;
+  x *= 0xff51afd7ed558ccdULL;
+  x ^= x >> 33;
+  x *= 0xc4ceb9fe1a85ec53ULL;
+  x ^= x >> 33;
+  return x;
+}
+
+internal U64
+u64_hash_from_s32(S32 x)
+{
+  // Cast through U32 so negative values hash by their bit pattern (no sign-extension surprises).
+  return u64_hash_from_u64((U64)(U32)x);
+}
+
+////////////////////////////////
 //~ rjf: MD5
 
 #include "../third_party/martins_hash/md5.h"
