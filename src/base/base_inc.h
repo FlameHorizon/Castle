@@ -32,6 +32,7 @@
 #include "base_test.h"
 #include "base_entry_point.h"
 #include "base_hashtable.h"
+#include "../parsing/xml.h"
 
 #if OS_WINDOWS
 # include "../win32/base/win32_base.h"
